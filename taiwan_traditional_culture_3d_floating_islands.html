@@ -1,0 +1,1233 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>台灣傳統文化 3D 浮空島世界 | Taiwan Cultural Floating Islands</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        amberGold: '#F59E0B',
+                        templeRed: '#DC2626',
+                        bambooGreen: '#059669',
+                        taiwanBlue: '#0284C7',
+                        woodBrown: '#78350F'
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;600;700;900&display=swap" rel="stylesheet">
+    <!-- Three.js & OrbitControls -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            touch-action: manipulation;
+            overflow: hidden;
+            user-select: none;
+        }
+        #webgl-container {
+            width: 100vw;
+            height: 100vh;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .pointer-auto {
+            pointer-events: auto;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(220, 38, 38, 0.4);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(220, 38, 38, 0.7);
+        }
+        /* Glassmorphism panel */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.15);
+        }
+        .glass-dark {
+            background: rgba(30, 41, 59, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .pulse-subtle {
+            animation: pulse 2.5s infinite ease-in-out;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.9; }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-800 antialiased h-screen w-screen relative">
+
+    <!-- 3D Canvas -->
+    <div id="webgl-container"></div>
+
+    <!-- UI Overlay Layer -->
+    <div class="ui-layer flex flex-col justify-between p-3 md:p-5">
+
+        <!-- Top Header Navigation -->
+        <header class="flex justify-between items-center w-full pointer-auto">
+            <div class="flex items-center space-x-3">
+                <button id="toggle-left-btn" onclick="toggleLeftPanel()" class="bg-red-600 hover:bg-red-700 text-white p-3 rounded-2xl shadow-lg transition-transform active:scale-95 flex items-center justify-center">
+                    <i class="fa-solid fa-bars text-xl"></i>
+                </button>
+                <div class="glass-panel px-4 py-2 rounded-2xl flex items-center space-x-3 border-l-4 border-red-600">
+                    <div class="text-2xl">🏮</div>
+                    <div>
+                        <h1 class="font-black text-lg md:text-xl text-slate-900 leading-none">台灣傳統文化 3D 浮空島</h1>
+                        <p class="text-xs text-slate-500 font-medium">Taiwan Cultural Heritage Islands</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Action Toolbar -->
+            <div class="flex items-center space-x-2">
+                <button onclick="toggleTourMode()" class="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2.5 rounded-2xl font-bold shadow-md flex items-center space-x-2 text-sm transition active:scale-95">
+                    <i class="fa-solid fa-compass text-lg"></i>
+                    <span class="hidden sm:inline">導覽模式</span>
+                </button>
+                <button onclick="toggleBuildWorkshop()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-2xl font-bold shadow-md flex items-center space-x-2 text-sm transition active:scale-95">
+                    <i class="fa-solid fa-hammer text-lg"></i>
+                    <span class="hidden sm:inline">建造工坊</span>
+                </button>
+                <button onclick="resetCameraView()" class="bg-slate-700 hover:bg-slate-800 text-white p-2.5 rounded-2xl shadow-md transition active:scale-95">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Middle Area: Dual Collapsible Sidebars + Canvas interactions -->
+        <div class="flex-1 flex justify-between my-3 relative overflow-hidden pointer-events-none">
+            
+            <!-- Left Panel: Navigator, Passport & Missions -->
+            <aside id="left-panel" class="w-80 md:w-96 max-h-full glass-panel rounded-3xl p-4 flex flex-col pointer-auto transition-all duration-500 ease-in-out transform translate-x-0 overflow-y-auto space-y-4 shadow-2xl">
+                <!-- Cultural Intro -->
+                <div class="bg-gradient-to-r from-red-500 to-amber-500 text-white p-4 rounded-2xl shadow-md">
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-xs font-bold uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full">探索冒險</span>
+                        <span id="completion-rate" class="text-xs font-black bg-black/20 px-2 py-0.5 rounded-full">完成度 0%</span>
+                    </div>
+                    <h2 class="text-lg font-black">尋訪台灣傳統之美</h2>
+                    <p class="text-xs text-red-50 mt-1 leading-relaxed">點擊 3D 浮空島、走動的 NPC 或使用列表導覽，學習台灣民俗、戲曲、老街與美食知識！</p>
+                </div>
+
+                <!-- Island Navigator List -->
+                <div>
+                    <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center space-x-2">
+                        <i class="fa-solid fa-map-location-dot text-red-600"></i>
+                        <span>浮空島選單 (8 座主題島)</span>
+                    </h3>
+                    <div id="island-nav-list" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Quest Passport / Badge Collection -->
+                <div class="border-t border-slate-200 pt-3">
+                    <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center space-x-2">
+                        <i class="fa-solid fa-passport text-amber-600"></i>
+                        <span>文化探索護照 & 成就徽章</span>
+                    </h3>
+                    <div id="badge-container" class="grid grid-cols-4 gap-2">
+                        <!-- Badges populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Custom Stats / Controls -->
+                <div class="border-t border-slate-200 pt-3 flex items-center justify-between text-xs text-slate-500">
+                    <span><i class="fa-solid fa-cubes text-emerald-600 mr-1"></i>3D 模型: Low-Poly</span>
+                    <span><i class="fa-solid fa-volume-high cursor-pointer text-slate-600" id="sound-btn" onclick="toggleAudio()"></i></span>
+                </div>
+            </aside>
+
+            <!-- Right Info Panel: Modal/Details Popup -->
+            <aside id="right-panel" class="w-80 md:w-96 max-h-full glass-panel rounded-3xl p-5 pointer-auto transition-all duration-500 ease-in-out transform translate-x-full absolute right-0 top-0 bottom-0 overflow-y-auto shadow-2xl flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex items-center space-x-2">
+                            <span id="island-badge-icon" class="text-3xl">🏮</span>
+                            <div>
+                                <h2 id="island-title" class="text-xl font-black text-slate-900">廟宇信仰島</h2>
+                                <span id="island-subtitle" class="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full">傳統民俗信仰與建築藝術</span>
+                            </div>
+                        </div>
+                        <button onclick="closeRightPanel()" class="text-slate-400 hover:text-slate-700 p-1 rounded-full">
+                            <i class="fa-solid fa-xmark text-xl"></i>
+                        </button>
+                    </div>
+
+                    <!-- Photo & Citation Block -->
+                    <div class="relative rounded-2xl overflow-hidden mb-4 bg-slate-100 shadow-inner group">
+                        <img id="island-photo" src="https://images.unsplash.com/photo-1543731068-7e0f5beff43a?w=600&auto=format&fit=crop" alt="Taiwan Heritage" class="w-full h-44 object-cover transform group-hover:scale-105 transition duration-500" onerror="this.src='https://placehold.co/600x400/DC2626/ffffff?text=Taiwan+Heritage'">
+                        <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 text-[10px] text-slate-200 flex justify-between items-center">
+                            <span id="photo-credit">照片來源: Wikimedia Commons / 授權可公開使用</span>
+                            <a id="photo-link" href="#" target="_blank" class="text-amber-300 underline hover:text-amber-100">查看原圖 <i class="fa-solid fa-arrow-up-right-from-square text-[8px]"></i></a>
+                        </div>
+                    </div>
+
+                    <!-- Cultural Background Detail -->
+                    <div class="space-y-3 text-xs text-slate-700 leading-relaxed">
+                        <div class="bg-amber-50 p-3 rounded-xl border border-amber-200">
+                            <h4 class="font-bold text-amber-900 mb-1 flex items-center">
+                                <i class="fa-solid fa-book-open mr-1.5 text-amber-600"></i>文化歷史介紹
+                            </h4>
+                            <p id="island-desc">台灣廟宇不只是宗教信仰中心，更是精緻民間工藝如剪粘、木雕、彩繪與交趾陶的集大成者。諸如大甲媽祖繞境等節慶，展現深刻的凝聚力。</p>
+                        </div>
+
+                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                            <h4 class="font-bold text-slate-900 mb-1 flex items-center">
+                                <i class="fa-solid fa-lightbulb mr-1.5 text-amber-500"></i>趣味小知識
+                            </h4>
+                            <p id="island-trivia">廟宇屋脊上的燕尾脊與馬背，不僅具備防火防風等傳統科學建築考量，更代表著屋主的官銜地位與陰陽五行象徵！</p>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Quiz Area -->
+                    <div class="mt-4 border-t border-slate-200 pt-3">
+                        <h4 class="font-bold text-slate-900 text-sm mb-2 flex items-center">
+                            <i class="fa-solid fa-circle-question mr-1.5 text-red-600"></i>島嶼文化挑戰賽
+                        </h4>
+                        <div id="quiz-box" class="bg-red-50/60 p-3 rounded-2xl border border-red-100">
+                            <p id="quiz-question" class="text-xs font-bold text-slate-800 mb-2">問答載入中...</p>
+                            <div id="quiz-options" class="space-y-1.5">
+                                <!-- Options dynamically built -->
+                            </div>
+                            <div id="quiz-result" class="mt-2 text-xs font-bold hidden"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-[11px] text-slate-400 text-center flex justify-between items-center border-t pt-2">
+                    <span id="data-source-citation">資料來源: 中華民國文化部 / 臺灣傳統藝術中心</span>
+                    <button id="focus-island-btn" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-xl font-bold transition">飛近島嶼</button>
+                </div>
+            </aside>
+        </div>
+
+        <!-- Tour Navigation Controls Overlay (When Tour Active) -->
+        <div id="tour-controls" class="pointer-auto hidden self-center bg-slate-900/90 text-white px-6 py-3 rounded-3xl backdrop-blur-md shadow-2xl flex items-center space-x-4 border border-slate-700 mb-2">
+            <span class="text-amber-400 font-bold text-sm"><i class="fa-solid fa-route mr-1"></i>全島自動導覽中</span>
+            <div class="flex items-center space-x-2">
+                <button onclick="prevTourStep()" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-full transition"><i class="fa-solid fa-backward-step"></i></button>
+                <button id="tour-play-btn" onclick="toggleTourPlay()" class="p-2 bg-amber-500 hover:bg-amber-600 rounded-full text-slate-900 transition"><i class="fa-solid fa-pause"></i></button>
+                <button onclick="nextTourStep()" class="p-2 bg-slate-800 hover:bg-slate-700 rounded-full transition"><i class="fa-solid fa-forward-step"></i></button>
+            </div>
+            <span id="tour-step-indicator" class="text-xs text-slate-300">1 / 8</span>
+            <button onclick="exitTourMode()" class="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-xl text-xs font-bold transition">結束導覽</button>
+        </div>
+
+        <!-- Bottom Building Workshop Bar (When Workshop Active) -->
+        <div id="build-workshop-bar" class="pointer-auto hidden self-center bg-white/95 backdrop-blur-md p-3 rounded-3xl shadow-2xl border border-slate-200 flex flex-col md:flex-row items-center space-y-2 md:space-y-0 md:space-x-4 max-w-full overflow-x-auto">
+            <div class="flex items-center space-x-2 border-r border-slate-200 pr-3">
+                <span class="text-emerald-700 font-bold text-sm flex items-center">
+                    <i class="fa-solid fa-hammer mr-1"></i> 建造工具箱
+                </span>
+                <span class="text-[11px] text-slate-400">點擊地面放置物件</span>
+            </div>
+
+            <!-- Props Selector -->
+            <div id="props-selector" class="flex items-center space-x-2 overflow-x-auto py-1">
+                <button onclick="selectBuildProp('temple')" class="prop-btn px-3 py-1.5 rounded-2xl bg-slate-100 hover:bg-emerald-50 border border-slate-200 text-xs font-bold flex items-center space-x-1.5 transition">
+                    <span>⛩️</span><span>傳統小廟</span>
+                </button>
+                <button onclick="selectBuildProp('lantern')" class="prop-btn px-3 py-1.5 rounded-2xl bg-slate-100 hover:bg-emerald-50 border border-slate-200 text-xs font-bold flex items-center space-x-1.5 transition">
+                    <span>🏮</span><span>大紅燈籠</span>
+                </button>
+                <button onclick="selectBuildProp('tree')" class="prop-btn px-3 py-1.5 rounded-2xl bg-slate-100 hover:bg-emerald-50 border border-slate-200 text-xs font-bold flex items-center space-x-1.5 transition">
+                    <span>🎋</span><span>綠意竹林</span>
+                </button>
+                <button onclick="selectBuildProp('teaset')" class="prop-btn px-3 py-1.5 rounded-2xl bg-slate-100 hover:bg-emerald-50 border border-slate-200 text-xs font-bold flex items-center space-x-1.5 transition">
+                    <span>🫖</span><span>奉茶桌椅</span>
+                </button>
+                <button onclick="selectBuildProp('bridge')" class="prop-btn px-3 py-1.5 rounded-2xl bg-slate-100 hover:bg-emerald-50 border border-slate-200 text-xs font-bold flex items-center space-x-1.5 transition">
+                    <span>🌉</span><span>木橋連接</span>
+                </button>
+                <button onclick="selectBuildProp('stall')" class="prop-btn px-3 py-1.5 rounded-2xl bg-slate-100 hover:bg-emerald-50 border border-slate-200 text-xs font-bold flex items-center space-x-1.5 transition">
+                    <span>🍡</span><span>夜市攤位</span>
+                </button>
+            </div>
+
+            <div class="flex items-center space-x-2 pl-2 border-l border-slate-200">
+                <button onclick="undoBuild()" class="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold text-slate-700" title="撤銷 (Undo)">
+                    <i class="fa-solid fa-rotate-left"></i>
+                </button>
+                <button onclick="clearCustomBuilds()" class="p-2 bg-red-100 hover:bg-red-200 rounded-xl text-xs font-bold text-red-600" title="清空建造">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+                <button onclick="toggleBuildWorkshop()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-bold transition">
+                    完成
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Application Script -->
+    <script>
+        /* =========================================================================
+         * 1. CULTURAL DATA & VERIFIED CITATIONS DATASTORE
+         * ========================================================================= */
+        const CULTURAL_DATA = [
+            {
+                id: 'temple',
+                name: '廟宇信仰島',
+                badge: '⛩️',
+                title: '傳統廟宇與民俗信仰',
+                subtitle: '大甲媽祖繞境 & 剪粘藝術',
+                pos: { x: 0, y: 0, z: 0 },
+                color: 0xdc2626,
+                photo: 'https://images.unsplash.com/photo-1543731068-7e0f5beff43a?w=600&auto=format&fit=crop',
+                credit: 'Wikimedia Commons / 攝影師公有領域共享',
+                link: 'https://zh.wikipedia.org/zh-tw/%E8%87%BA%E7%81%A3%E5 meo%E5%AE%87',
+                desc: '台灣廟宇是傳統信仰與民俗工藝的匯聚地。從大甲媽祖繞境名列世界三大宗教盛事之一，到交趾陶、剪粘與繪畫，展現了台灣豐厚的文化底蘊。',
+                trivia: '廟宇屋頂兩側向上揚起的「燕尾脊」，在古代多代表有功名官銜的人家或宮廟建築！',
+                citation: '資料來源: 中華民國文化部台灣大百科全書',
+                quiz: {
+                    q: '台灣傳統廟宇屋脊上常見的精緻陶瓷裝飾工藝稱作什麼？',
+                    options: ['剪粘與交趾陶', '琉璃金工', '大理石浮雕'],
+                    ans: 0
+                }
+            },
+            {
+                id: 'opera',
+                name: '傳統戲曲島',
+                badge: '🎭',
+                title: '掌中戲與歌仔戲',
+                subtitle: '布袋戲歷史與野台表演',
+                pos: { x: 35, y: 3, z: -20 },
+                color: 0x7c3aed,
+                photo: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop',
+                credit: 'Unsplash / 公開授權',
+                link: 'https://ncfta.gov.tw/',
+                desc: '布袋戲（掌中戲）與歌仔戲是台灣最具代表性的本土表演藝術。從野台戲戲台到電視布袋戲《霹靂布袋戲》，木偶動作生動、口白活靈活活。',
+                trivia: '布袋戲偶的頭部通常由梧桐木或樟木刻成，掌中戲之名來自演師僅用一隻手掌操控整尊木偶！',
+                citation: '資料來源: 國立傳統藝術中心 (NCFTA)',
+                quiz: {
+                    q: '台灣唯一原生發源於在地、並以台語演唱的戲曲劇種是？',
+                    options: ['京劇', '歌仔戲', '昆曲'],
+                    ans: 1
+                }
+            },
+            {
+                id: 'street',
+                name: '老街建築島',
+                badge: '🧱',
+                title: '巴洛克與紅磚老街',
+                subtitle: '大溪、迪化街與三峽老街',
+                pos: { x: -35, y: 2, z: 20 },
+                color: 0xb45309,
+                photo: 'https://images.unsplash.com/photo-1590059208019-15224887b38c?w=600&auto=format&fit=crop',
+                credit: 'Wikimedia Commons / 臺灣老街歷史建築庫',
+                link: 'https://www.taiwan.net.tw/',
+                desc: '台灣歷史老街如大稻埕迪化街、三峽老街，融合了日治時期的仿巴洛克式牌樓造型與閩南亭仔腳（騎樓）特色，見證台灣早期商業盛況。',
+                trivia: '「亭仔腳」是指遮陽防雨的騎樓空間，呈現了台灣早期鄰里互助與人情味的生活智慧！',
+                citation: '資料來源: 交通部觀光署',
+                quiz: {
+                    q: '三峽老街與迪化街建築常見的雕花門面風格受何種西方建築思潮影響？',
+                    options: ['哥德式建築', '仿巴洛克風格', '現代極簡風'],
+                    ans: 1
+                }
+            },
+            {
+                id: 'tea',
+                name: '茶藝陶瓷島',
+                badge: '🫖',
+                title: '台灣茶道與鶯歌陶瓷',
+                subtitle: '凍頂烏龍與功夫茶藝',
+                pos: { x: -30, y: 5, z: -35 },
+                color: 0x059669,
+                photo: 'https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=600&auto=format&fit=crop',
+                credit: 'Unsplash / 台灣茶文化攝影',
+                link: 'https://www.yttceramics.org.tw/',
+                desc: '台灣得天獨厚的高山氣候孕育出高品質高山烏龍茶與東方美人茶。結合新北鶯歌精湛的陶瓷茶具雕琢，品茗成為極具人文氣息的生活藝術。',
+                trivia: '「東方美人茶」因小綠葉蟬叮咬（著蝖）後發酵，帶有獨特天然蜜香，連英國維多利亞女王都曾讚賞！',
+                citation: '資料來源: 新北市立鶯歌陶瓷博物館',
+                quiz: {
+                    q: '東方美人茶獨特的天然果蜜香味是因為哪種昆蟲叮咬採摘的茶菁？',
+                    options: ['小綠葉蟬', '瓢蟲', '蜜蜂'],
+                    ans: 0
+                }
+            },
+            {
+                id: 'craft',
+                name: '傳統工藝島',
+                badge: '🎋',
+                title: '竹編、漆器與油紙傘',
+                subtitle: '美濃紙傘與鹿港木雕工藝',
+                pos: { x: 30, y: -2, z: 30 },
+                color: 0xd97706,
+                photo: 'https://images.unsplash.com/photo-1584282479242-6284a141b7dd?w=600&auto=format&fit=crop',
+                credit: 'Wikimedia Commons / 鹿港工藝保存資料',
+                link: 'https://www.ntcri.gov.tw/',
+                desc: '高雄美濃的手工油紙傘象徵圓滿吉祥，鹿港傳統木雕與竹編技藝更凝聚了技藝工匠一輩子的專注精神，是台灣珍貴的無形文化資產。',
+                trivia: '客家文化中，油紙傘的「紙」與「子」諧音，且傘面打開呈圓形，常用作女子嫁妝祝賀「多子多孫、圓滿吉祥」！',
+                citation: '資料來源: 國立臺灣工藝研究發展中心',
+                quiz: {
+                    q: '在高雄美濃客家傳統婚俗中，贈送油紙傘代表何種美好祝願？',
+                    options: ['風調雨順', '圓滿與多子多孫', '步步高升'],
+                    ans: 1
+                }
+            },
+            {
+                id: 'festival',
+                name: '節慶民俗島',
+                badge: '🏮',
+                title: '平溪天燈與元宵慶典',
+                subtitle: '蜂炮、燒王船與神將遶境',
+                pos: { x: 0, y: 6, z: -45 },
+                color: 0xe11d48,
+                photo: 'https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=600&auto=format&fit=crop',
+                credit: 'Wikimedia Commons / 平溪天燈節現場',
+                link: 'https://tour.ntpc.gov.tw/',
+                desc: '台灣歲時節慶熱鬧非凡！元宵節新北平溪數千天燈齊飛、鹽水蜂炮萬發齊放、屏東東港迎王平安祭典燒王船，充滿震撼力與文化凝聚力。',
+                trivia: '早期平溪天燈是山區村落報平安的信號，演變至今日已成為祈求平安與國際聞名的慶典活動！',
+                citation: '資料來源: 新北市觀光旅遊網',
+                quiz: {
+                    q: '平溪放天燈活動在早期山區拓墾時代的主要功能是什麼？',
+                    options: ['傳遞通訊與報平安', '慶祝農作物豐收', '招攬外國觀光客'],
+                    ans: 0
+                }
+            },
+            {
+                id: 'food',
+                name: '傳統美食島',
+                badge: '🍧',
+                title: '夜市小吃與辦桌文化',
+                subtitle: '珍珠奶茶、小籠包與滷肉飯',
+                pos: { x: -40, y: -2, z: -10 },
+                color: 0xeab308,
+                photo: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&auto=format&fit=crop',
+                credit: 'Unsplash / 台灣夜市美食攝影',
+                link: 'https://www.taiwan.net.tw/m1.aspx?sNo=0000016',
+                desc: '台灣美食名揚國際！從充滿市井熱情的夜市小吃如珍珠奶茶、牛肉麵、蚵仔煎，到熱情澎湃的辦桌總舖師文化，勾勒出美好的台灣滋味。',
+                trivia: '台灣「辦桌」文化歷史悠久，由「總舖師」帶領團隊在露天場所搭棚設宴，展現道地的台灣人情味！',
+                citation: '資料來源: 交通部觀光署台灣美食介紹',
+                quiz: {
+                    q: '台灣傳統露天宴席中，負責統領廚房全場菜色調度的靈魂大廚稱作？',
+                    options: ['掌櫃', '總舖師', '茶空頭'],
+                    ans: 1
+                }
+            },
+            {
+                id: 'toy',
+                name: '懷舊童玩島',
+                badge: '🪀',
+                title: '古早味童玩與柑仔店',
+                subtitle: '陀螺、竹蟬、尪仔標與彈珠台',
+                pos: { x: 40, y: 1, z: 0 },
+                color: 0x2563eb,
+                photo: 'https://images.unsplash.com/photo-1566576912321-d58ddd7a6088?w=600&auto=format&fit=crop',
+                credit: 'Unsplash / 傳統懷舊童玩',
+                link: 'https://minnan.tycg.gov.tw/',
+                desc: '在沒有智慧型手機的年代，台灣柑仔店販售著打陀螺、甩竹蟬、打尪仔標、打彈珠與跳格子等童玩，是幾代台灣人充滿溫度的童年回憶。',
+                trivia: '「尪仔標」是印有各式人物畫像的圓形厚紙牌，小孩子會利用手掌空氣彈力或擊打試圖將對方的紙牌翻面獲勝！',
+                citation: '資料來源: 桃園傳統民俗文化網',
+                quiz: {
+                    q: '早期台灣孩童在柑仔店常玩的圓形紙牌童玩名稱是什麼？',
+                    options: ['尪仔標', '紙飛機', '九宮格'],
+                    ans: 0
+                }
+            }
+        ];
+
+        /* =========================================================================
+         * 2. GLOBAL APP STATE & USER PROGRESS (LocalStorage)
+         * ========================================================================= */
+        let state = {
+            currentIslandIndex: 0,
+            completedQuizzes: JSON.parse(localStorage.getItem('tw_culture_completed') || '[]'),
+            customBuilds: JSON.parse(localStorage.getItem('tw_culture_builds') || '[]'),
+            isTourActive: false,
+            tourStep: 0,
+            tourInterval: null,
+            isWorkshopActive: false,
+            selectedProp: 'temple',
+            leftPanelOpen: true,
+            soundEnabled: true
+        };
+
+        /* =========================================================================
+         * 3. THREE.JS ENGINE SETUP
+         * ========================================================================= */
+        let scene, camera, renderer, controls;
+        let islandGroupMap = {};
+        let animatedNPCs = [];
+        let raycaster, mouse;
+        let previewMesh = null;
+        let currentFocusTarget = new THREE.Vector3(0, 0, 0);
+
+        function init3DEngine() {
+            const container = document.getElementById('webgl-container');
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xbae6fd); // Light atmospheric sky blue
+            scene.fog = new THREE.FogExp2(0xbae6fd, 0.005);
+
+            // Camera
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 45, 95);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2.05; // Prevent camera going below ground
+            controls.minDistance = 10;
+            controls.maxDistance = 200;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.DirectionalLight(0xfffaed, 0.85);
+            sunLight.position.set(60, 100, 40);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 2048;
+            sunLight.shadow.mapSize.height = 2048;
+            sunLight.shadow.camera.near = 0.5;
+            sunLight.shadow.camera.far = 250;
+            const d = 80;
+            sunLight.shadow.camera.left = -d;
+            sunLight.shadow.camera.right = d;
+            sunLight.shadow.camera.top = d;
+            sunLight.shadow.camera.bottom = -d;
+            scene.add(sunLight);
+
+            // Raycasting
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            // Build Scene Objects
+            createClouds();
+            buildAllIslands();
+            buildBridges();
+            loadSavedCustomBuilds();
+
+            // Event Listeners
+            window.addEventListener('resize', onWindowResize);
+            renderer.domElement.addEventListener('pointerdown', onDocumentPointerDown);
+            renderer.domElement.addEventListener('pointermove', onDocumentPointerMove);
+        }
+
+        /* =========================================================================
+         * 4. PROCEDURAL 3D LOW-POLY GENERATOR
+         * ========================================================================= */
+
+        // Floating Sky Clouds
+        function createClouds() {
+            const cloudGroup = new THREE.Group();
+            const cloudGeo = new THREE.DodecahedronGeometry(3, 1);
+            const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.85 });
+
+            for (let i = 0; i < 20; i++) {
+                const singleCloud = new THREE.Group();
+                const puffs = 3 + Math.floor(Math.random() * 4);
+                for (let j = 0; j < puffs; j++) {
+                    const p = new THREE.Mesh(cloudGeo, cloudMat);
+                    p.position.set(j * 2, Math.random() * 1.5, Math.random() * 2);
+                    const s = 0.8 + Math.random() * 0.8;
+                    p.scale.set(s, s, s);
+                    singleCloud.add(p);
+                }
+                singleCloud.position.set(
+                    (Math.random() - 0.5) * 220,
+                    15 + Math.random() * 25,
+                    (Math.random() - 0.5) * 220
+                );
+                cloudGroup.add(singleCloud);
+            }
+            scene.add(cloudGroup);
+        }
+
+        // Floating Island Builder
+        function buildAllIslands() {
+            CULTURAL_DATA.forEach((data, idx) => {
+                const islandGroup = new THREE.Group();
+                islandGroup.position.set(data.pos.x, data.pos.y, data.pos.z);
+                islandGroup.userData = { id: data.id, index: idx, name: data.name };
+
+                // 1. Island Terrain Base (Low-poly hexagonal cone/cylinder)
+                const radius = 11 + Math.random() * 2;
+                const topGeo = new THREE.CylinderGeometry(radius, radius * 0.85, 3, 7);
+                const topMat = new THREE.MeshLambertMaterial({ color: 0x4ade80, flatShading: true }); // Lush Green
+                const topMesh = new THREE.Mesh(topGeo, topMat);
+                topMesh.receiveShadow = true;
+                topMesh.name = "island_surface";
+                islandGroup.add(topMesh);
+
+                // Bottom rocky cone
+                const botGeo = new THREE.ConeGeometry(radius * 0.85, 12, 7);
+                const botMat = new THREE.MeshLambertMaterial({ color: 0x78350f, flatShading: true }); // Brown earth
+                const botMesh = new THREE.Mesh(botGeo, botMat);
+                botMesh.position.y = -7.5;
+                botMesh.rotation.x = Math.PI;
+                botMesh.receiveShadow = true;
+                islandGroup.add(botMesh);
+
+                // 2. Specialized Cultural Landmark Decoration per Island
+                buildIslandLandmark(islandGroup, data.id);
+
+                // 3. Add Trees & Props
+                addNaturalDecorations(islandGroup, radius);
+
+                // 4. Add Animated Walking NPC
+                addNPC(islandGroup, data);
+
+                scene.add(islandGroup);
+                islandGroupMap[data.id] = islandGroup;
+            });
+        }
+
+        // Landmark Specific Procedural Low-Poly Models
+        function buildIslandLandmark(group, id) {
+            switch(id) {
+                case 'temple':
+                    // Traditional Taiwanese Temple Structure
+                    const temple = new THREE.Group();
+                    // Base platform
+                    const base = new THREE.Mesh(new THREE.BoxGeometry(8, 0.8, 6), new THREE.MeshLambertMaterial({ color: 0x94a3b8 }));
+                    base.position.y = 1.9;
+                    temple.add(base);
+                    // Red Pillars
+                    const pillarMat = new THREE.MeshLambertMaterial({ color: 0xdc2626 });
+                    [[-3.2, -2.2], [3.2, -2.2], [-3.2, 2.2], [3.2, 2.2]].forEach(p => {
+                        const pil = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 3.5), pillarMat);
+                        pil.position.set(p[0], 3.8, p[1]);
+                        temple.add(pil);
+                    });
+                    // Curved Swallowtail Roof
+                    const roof = new THREE.Mesh(new THREE.ConeGeometry(6, 2.5, 4), new THREE.MeshLambertMaterial({ color: 0xef4444, flatShading: true }));
+                    roof.position.y = 6.2;
+                    roof.rotation.y = Math.PI / 4;
+                    temple.add(roof);
+                    // Gold Ridge
+                    const ridge = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.4, 0.4), new THREE.MeshLambertMaterial({ color: 0xf59e0b }));
+                    ridge.position.y = 7.2;
+                    temple.add(ridge);
+                    group.add(temple);
+                    break;
+
+                case 'opera':
+                    // Puppet / Opera Stage
+                    const stage = new THREE.Group();
+                    const sBase = new THREE.Mesh(new THREE.BoxGeometry(7, 2, 5), new THREE.MeshLambertMaterial({ color: 0x78350f }));
+                    sBase.position.y = 2.5;
+                    stage.add(sBase);
+                    // Back Curtain
+                    const curtain = new THREE.Mesh(new THREE.PlaneGeometry(6, 4), new THREE.MeshLambertMaterial({ color: 0xdc2626, side: THREE.DoubleSide }));
+                    curtain.position.set(0, 5, -2.4);
+                    stage.add(curtain);
+                    // Stage Roof
+                    const sRoof = new THREE.Mesh(new THREE.BoxGeometry(8, 0.6, 6), new THREE.MeshLambertMaterial({ color: 0xf59e0b }));
+                    sRoof.position.y = 7.2;
+                    stage.add(sRoof);
+                    group.add(stage);
+                    break;
+
+                case 'street':
+                    // Red-brick Baroque Storefronts
+                    const street = new THREE.Group();
+                    const brickMat = new THREE.MeshLambertMaterial({ color: 0xb45309 });
+                    const house1 = new THREE.Mesh(new THREE.BoxGeometry(4.5, 6, 4), brickMat);
+                    house1.position.set(-2.5, 4.5, -1);
+                    street.add(house1);
+
+                    const house2 = new THREE.Mesh(new THREE.BoxGeometry(4.5, 5, 4), brickMat);
+                    house2.position.set(2.5, 4, -1);
+                    street.add(house2);
+
+                    // Archway Canopy
+                    const arch = new THREE.Mesh(new THREE.BoxGeometry(9.5, 1, 2), new THREE.MeshLambertMaterial({ color: 0xfef3c7 }));
+                    arch.position.set(0, 6.5, 1);
+                    street.add(arch);
+                    group.add(street);
+                    break;
+
+                case 'tea':
+                    // Teapot & Cup Sculpture
+                    const teaGroup = new THREE.Group();
+                    const potMat = new THREE.MeshLambertMaterial({ color: 0x059669 });
+                    const pot = new THREE.Mesh(new THREE.SphereGeometry(2.2, 12, 12), potMat);
+                    pot.position.y = 3.7;
+                    teaGroup.add(pot);
+
+                    const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.6, 2.5), potMat);
+                    spout.position.set(2.2, 4.2, 0);
+                    spout.rotation.z = -Math.PI / 3;
+                    teaGroup.add(spout);
+
+                    // Wooden Tea Table
+                    const table = new THREE.Mesh(new THREE.CylinderGeometry(4, 4, 0.6, 8), new THREE.MeshLambertMaterial({ color: 0x78350f }));
+                    table.position.y = 1.8;
+                    teaGroup.add(table);
+                    group.add(teaGroup);
+                    break;
+
+                case 'craft':
+                    // Oil Paper Parasol Sculpture
+                    const craft = new THREE.Group();
+                    const umbrellaMat = new THREE.MeshLambertMaterial({ color: 0xf59e0b, side: THREE.DoubleSide });
+                    const umbrella = new THREE.Mesh(new THREE.ConeGeometry(4.5, 1.5, 12), umbrellaMat);
+                    umbrella.position.set(0, 5.5, 0);
+                    umbrella.rotation.x = Math.PI;
+                    craft.add(umbrella);
+
+                    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 5), new THREE.MeshLambertMaterial({ color: 0x451a03 }));
+                    pole.position.y = 3.5;
+                    craft.add(pole);
+                    group.add(craft);
+                    break;
+
+                case 'festival':
+                    // Sky Lantern Floating Monument
+                    const fest = new THREE.Group();
+                    const lanternMat = new THREE.MeshLambertMaterial({ color: 0xf43f5e, emissive: 0x9f1239, emissiveIntensity: 0.3 });
+                    for(let i=0; i<3; i++) {
+                        const skyLantern = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 0.8, 2.5, 8), lanternMat);
+                        skyLantern.position.set((i-1)*3, 5 + i*1.5, (i%2)*2);
+                        fest.add(skyLantern);
+                    }
+                    group.add(fest);
+                    break;
+
+                case 'food':
+                    // Night Market Stall & Giant Boba Tea
+                    const food = new THREE.Group();
+                    // Giant Boba Cup
+                    const cup = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.2, 3.5, 12), new THREE.MeshLambertMaterial({ color: 0xfef3c7, transparent: true, opacity: 0.9 }));
+                    cup.position.set(-2.5, 3.25, 0);
+                    food.add(cup);
+                    const straw = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 4.5), new THREE.MeshLambertMaterial({ color: 0xdc2626 }));
+                    straw.position.set(-2.2, 4.5, 0);
+                    straw.rotation.z = -0.2;
+                    food.add(straw);
+
+                    // Food Stall Counter
+                    const stall = new THREE.Mesh(new THREE.BoxGeometry(5, 2.2, 3), new THREE.MeshLambertMaterial({ color: 0xb45309 }));
+                    stall.position.set(2, 2.6, 0);
+                    food.add(stall);
+                    group.add(food);
+                    break;
+
+                case 'toy':
+                    // Nostalgic Giant Wooden Top (陀螺) & Pinwheel
+                    const toy = new THREE.Group();
+                    const topMesh = new THREE.Mesh(new THREE.ConeGeometry(2.5, 3.5, 10), new THREE.MeshLambertMaterial({ color: 0x2563eb }));
+                    topMesh.position.set(-1.5, 3.25, 0);
+                    toy.add(topMesh);
+
+                    // Pinwheel
+                    const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 5), new THREE.MeshLambertMaterial({ color: 0x78350f }));
+                    pin.position.set(2.5, 3.5, 0);
+                    toy.add(pin);
+                    const wheel = new THREE.Mesh(new THREE.BoxGeometry(2.2, 2.2, 0.1), new THREE.MeshLambertMaterial({ color: 0xef4444 }));
+                    wheel.position.set(2.5, 5.5, 0);
+                    wheel.rotation.z = Math.PI / 4;
+                    toy.add(wheel);
+                    group.add(toy);
+                    break;
+            }
+        }
+
+        // Add Trees, Red Lanterns & Environment Props
+        function addNaturalDecorations(group, radius) {
+            const treeMat = new THREE.MeshLambertMaterial({ color: 0x15803d, flatShading: true });
+            const trunkMat = new THREE.MeshLambertMaterial({ color: 0x78350f });
+
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2 + Math.random() * 0.5;
+                const r = radius * 0.65;
+                const x = Math.cos(angle) * r;
+                const z = Math.sin(angle) * r;
+
+                const tree = new THREE.Group();
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.3, 1.8), trunkMat);
+                trunk.position.y = 2.4;
+                tree.add(trunk);
+
+                const leaves = new THREE.Mesh(new THREE.ConeGeometry(1.2, 2.8, 5), treeMat);
+                leaves.position.y = 4.2;
+                tree.add(leaves);
+
+                tree.position.set(x, 0, z);
+                group.add(tree);
+            }
+        }
+
+        // Add Interactive Animated Walking Low-Poly NPC
+        function addNPC(islandGroup, data) {
+            const npc = new THREE.Group();
+            
+            // Body
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.4, 1.4, 8), new THREE.MeshLambertMaterial({ color: data.color }));
+            body.position.y = 2.2;
+            npc.add(body);
+
+            // Head
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.45, 8, 8), new THREE.MeshLambertMaterial({ color: 0xfed7aa }));
+            head.position.y = 3.2;
+            npc.add(head);
+
+            // Traditional Straw/Temple Hat
+            const hat = new THREE.Mesh(new THREE.ConeGeometry(0.8, 0.4, 8), new THREE.MeshLambertMaterial({ color: 0xd97706 }));
+            hat.position.y = 3.6;
+            npc.add(hat);
+
+            npc.position.set((Math.random() - 0.5) * 8, 0, (Math.random() - 0.5) * 8);
+            npc.userData = { 
+                islandId: data.id, 
+                name: `${data.name} NPC`,
+                angle: Math.random() * Math.PI * 2,
+                speed: 0.02 + Math.random() * 0.01
+            };
+
+            islandGroup.add(npc);
+            animatedNPCs.push(npc);
+        }
+
+        // Connect Islands with 3D Bridges
+        function buildBridges() {
+            const bridgeMat = new THREE.MeshLambertMaterial({ color: 0x78350f });
+            // Connect island 0 (Temple) to island 1 (Opera), etc.
+            const connections = [
+                ['temple', 'opera'],
+                ['temple', 'street'],
+                ['temple', 'food'],
+                ['opera', 'craft'],
+                ['street', 'tea'],
+                ['festival', 'tea']
+            ];
+
+            connections.forEach(([idA, idB]) => {
+                const posA = islandGroupMap[idA].position;
+                const posB = islandGroupMap[idB].position;
+
+                const distance = posA.distanceTo(posB);
+                const bridge = new THREE.Group();
+
+                const plank = new THREE.Mesh(new THREE.BoxGeometry(2, 0.3, distance - 16), bridgeMat);
+                plank.position.set(0, 0, 0);
+                bridge.add(plank);
+
+                // Calculate center and rotation
+                const mid = new THREE.Vector3().addVectors(posA, posB).multiplyScalar(0.5);
+                bridge.position.copy(mid);
+                bridge.position.y -= 1;
+                bridge.lookAt(posB);
+
+                scene.add(bridge);
+            });
+        }
+
+        /* =========================================================================
+         * 5. BUILDER WORKSHOP PROPS & RAYCASTING
+         * ========================================================================= */
+        function selectBuildProp(type) {
+            state.selectedProp = type;
+            document.querySelectorAll('.prop-btn').forEach(b => b.classList.remove('border-emerald-600', 'bg-emerald-50'));
+            // Highlight selected button
+            event.currentTarget.classList.add('border-emerald-600', 'bg-emerald-50');
+        }
+
+        function createPropMesh(type) {
+            const group = new THREE.Group();
+            if (type === 'temple') {
+                const p = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshLambertMaterial({ color: 0xdc2626 }));
+                p.position.y = 1;
+                group.add(p);
+            } else if (type === 'lantern') {
+                const l = new THREE.Mesh(new THREE.SphereGeometry(0.8, 8, 8), new THREE.MeshLambertMaterial({ color: 0xef4444 }));
+                l.position.y = 1.8;
+                group.add(l);
+            } else if (type === 'tree') {
+                const t = new THREE.Mesh(new THREE.ConeGeometry(1, 3, 5), new THREE.MeshLambertMaterial({ color: 0x16a34a }));
+                t.position.y = 1.5;
+                group.add(t);
+            } else if (type === 'teaset') {
+                const ts = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.6), new THREE.MeshLambertMaterial({ color: 0x78350f }));
+                ts.position.y = 0.3;
+                group.add(ts);
+            } else if (type === 'bridge') {
+                const b = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.2, 5), new THREE.MeshLambertMaterial({ color: 0xb45309 }));
+                b.position.y = 0.1;
+                group.add(b);
+            } else {
+                const s = new THREE.Mesh(new THREE.BoxGeometry(2.5, 1.5, 1.5), new THREE.MeshLambertMaterial({ color: 0xeab308 }));
+                s.position.y = 0.75;
+                group.add(s);
+            }
+            return group;
+        }
+
+        function loadSavedCustomBuilds() {
+            state.customBuilds.forEach(item => {
+                const prop = createPropMesh(item.type);
+                prop.position.set(item.x, item.y, item.z);
+                scene.add(prop);
+            });
+        }
+
+        function clearCustomBuilds() {
+            state.customBuilds = [];
+            localStorage.removeItem('tw_culture_builds');
+            location.reload();
+        }
+
+        function undoBuild() {
+            if (state.customBuilds.length > 0) {
+                state.customBuilds.pop();
+                localStorage.setItem('tw_culture_builds', JSON.stringify(state.customBuilds));
+                location.reload();
+            }
+        }
+
+        /* =========================================================================
+         * 6. UI PANELS & NAVIGATION LOGIC
+         * ========================================================================= */
+        function renderUI() {
+            // Render Island List
+            const navContainer = document.getElementById('island-nav-list');
+            navContainer.innerHTML = '';
+            CULTURAL_DATA.forEach((data, index) => {
+                const isCompleted = state.completedQuizzes.includes(data.id);
+                const btn = document.createElement('button');
+                btn.className = `w-full text-left p-2 rounded-xl text-xs font-bold flex items-center justify-between transition ${state.currentIslandIndex === index ? 'bg-red-600 text-white shadow-md' : 'bg-slate-100 hover:bg-slate-200 text-slate-800'}`;
+                btn.onclick = () => focusOnIsland(index);
+                btn.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <span>${data.badge}</span>
+                        <span>${data.name}</span>
+                    </div>
+                    ${isCompleted ? '<span class="text-emerald-400 font-extrabold"><i class="fa-solid fa-circle-check"></i></span>' : '<span class="text-slate-400 text-[10px]">未探索</span>'}
+                `;
+                navContainer.appendChild(btn);
+            });
+
+            // Render Passport Badges
+            const badgeContainer = document.getElementById('badge-container');
+            badgeContainer.innerHTML = '';
+            CULTURAL_DATA.forEach((data) => {
+                const isUnlocked = state.completedQuizzes.includes(data.id);
+                const badgeEl = document.createElement('div');
+                badgeEl.className = `aspect-square rounded-2xl flex flex-col items-center justify-center p-1.5 text-center transition ${isUnlocked ? 'bg-amber-100 border-2 border-amber-400 text-amber-900 shadow-sm' : 'bg-slate-100 border border-slate-200 text-slate-300 opacity-60'}`;
+                badgeEl.title = data.name;
+                badgeEl.innerHTML = `
+                    <span class="text-xl">${data.badge}</span>
+                    <span class="text-[9px] font-bold mt-0.5 truncate w-full">${data.name.replace('島','')}</span>
+                `;
+                badgeContainer.appendChild(badgeEl);
+            });
+
+            // Update Progress Percentage
+            const rate = Math.round((state.completedQuizzes.length / CULTURAL_DATA.length) * 100);
+            document.getElementById('completion-rate').innerText = `完成度 ${rate}%`;
+        }
+
+        function focusOnIsland(index) {
+            state.currentIslandIndex = index;
+            const data = CULTURAL_DATA[index];
+            const targetPos = data.pos;
+
+            // Animate Camera
+            const startCamera = camera.position.clone();
+            const targetCamera = new THREE.Vector3(targetPos.x, targetPos.y + 18, targetPos.z + 32);
+            
+            const startTarget = controls.target.clone();
+            const endTarget = new THREE.Vector3(targetPos.x, targetPos.y + 2, targetPos.z);
+
+            let progress = 0;
+            function animateCam() {
+                progress += 0.04;
+                camera.position.lerpVectors(startCamera, targetCamera, progress);
+                controls.target.lerpVectors(startTarget, endTarget, progress);
+                controls.update();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animateCam);
+                }
+            }
+            animateCam();
+
+            // Populate Right Panel Info Hub
+            openRightPanel(data);
+            renderUI();
+        }
+
+        function openRightPanel(data) {
+            document.getElementById('island-badge-icon').innerText = data.badge;
+            document.getElementById('island-title').innerText = data.name;
+            document.getElementById('island-subtitle').innerText = data.subtitle;
+            document.getElementById('island-photo').src = data.photo;
+            document.getElementById('photo-credit').innerText = `來源: ${data.credit}`;
+            document.getElementById('photo-link').href = data.link;
+            document.getElementById('island-desc').innerText = data.desc;
+            document.getElementById('island-trivia').innerText = data.trivia;
+            document.getElementById('data-source-citation').innerText = data.citation;
+
+            document.getElementById('focus-island-btn').onclick = () => focusOnIsland(state.currentIslandIndex);
+
+            // Render Quiz
+            const quizBox = document.getElementById('quiz-box');
+            const qQuestion = document.getElementById('quiz-question');
+            const qOptions = document.getElementById('quiz-options');
+            const qResult = document.getElementById('quiz-result');
+
+            qQuestion.innerText = data.quiz.q;
+            qOptions.innerHTML = '';
+            qResult.className = 'mt-2 text-xs font-bold hidden';
+
+            data.quiz.options.forEach((opt, idx) => {
+                const optBtn = document.createElement('button');
+                optBtn.className = 'w-full text-left px-3 py-2 rounded-xl bg-white hover:bg-amber-100 border border-slate-200 text-xs font-medium transition active:scale-95';
+                optBtn.innerText = `${idx + 1}. ${opt}`;
+                optBtn.onclick = () => handleQuizAnswer(data.id, idx, data.quiz.ans, qResult);
+                qOptions.appendChild(optBtn);
+            });
+
+            // Slide in right panel
+            const panel = document.getElementById('right-panel');
+            panel.classList.remove('translate-x-full');
+            panel.classList.add('translate-x-0');
+        }
+
+        function closeRightPanel() {
+            const panel = document.getElementById('right-panel');
+            panel.classList.remove('translate-x-0');
+            panel.classList.add('translate-x-full');
+        }
+
+        function handleQuizAnswer(islandId, selectedOption, correctOption, resultEl) {
+            resultEl.classList.remove('hidden');
+            if (selectedOption === correctOption) {
+                resultEl.className = 'mt-2 text-xs font-bold text-emerald-600 bg-emerald-50 p-2 rounded-xl border border-emerald-200';
+                resultEl.innerHTML = '<i class="fa-solid fa-circle-check mr-1"></i>回答正確！恭喜解鎖文化成就徽章！';
+                
+                if (!state.completedQuizzes.includes(islandId)) {
+                    state.completedQuizzes.push(islandId);
+                    localStorage.setItem('tw_culture_completed', JSON.stringify(state.completedQuizzes));
+                    renderUI();
+                }
+            } else {
+                resultEl.className = 'mt-2 text-xs font-bold text-red-600 bg-red-50 p-2 rounded-xl border border-red-200';
+                resultEl.innerHTML = '<i class="fa-solid fa-circle-xmark mr-1"></i>答案不太對喔，再試一次看看吧！';
+            }
+        }
+
+        function toggleLeftPanel() {
+            const leftPanel = document.getElementById('left-panel');
+            state.leftPanelOpen = !state.leftPanelOpen;
+            if (state.leftPanelOpen) {
+                leftPanel.classList.remove('-translate-x-full');
+                leftPanel.classList.add('translate-x-0');
+            } else {
+                leftPanel.classList.remove('translate-x-0');
+                leftPanel.classList.add('-translate-x-full');
+            }
+        }
+
+        function resetCameraView() {
+            focusOnIsland(0);
+        }
+
+        function toggleAudio() {
+            state.soundEnabled = !state.soundEnabled;
+            const btn = document.getElementById('sound-btn');
+            btn.className = state.soundEnabled ? 'fa-solid fa-volume-high cursor-pointer text-slate-600' : 'fa-solid fa-volume-xmark cursor-pointer text-slate-400';
+        }
+
+        /* =========================================================================
+         * 7. GUIDED AUTO-TOUR MODE
+         * ========================================================================= */
+        function toggleTourMode() {
+            state.isTourActive = !state.isTourActive;
+            const tourBar = document.getElementById('tour-controls');
+            if (state.isTourActive) {
+                tourBar.classList.remove('hidden');
+                state.tourStep = 0;
+                runTourStep();
+            } else {
+                exitTourMode();
+            }
+        }
+
+        function runTourStep() {
+            if (!state.isTourActive) return;
+            focusOnIsland(state.tourStep);
+            document.getElementById('tour-step-indicator').innerText = `${state.tourStep + 1} / ${CULTURAL_DATA.length}`;
+        }
+
+        function nextTourStep() {
+            state.tourStep = (state.tourStep + 1) % CULTURAL_DATA.length;
+            runTourStep();
+        }
+
+        function prevTourStep() {
+            state.tourStep = (state.tourStep - 1 + CULTURAL_DATA.length) % CULTURAL_DATA.length;
+            runTourStep();
+        }
+
+        function toggleTourPlay() {
+            const btn = document.getElementById('tour-play-btn');
+            if (state.tourInterval) {
+                clearInterval(state.tourInterval);
+                state.tourInterval = null;
+                btn.innerHTML = '<i class="fa-solid fa-play"></i>';
+            } else {
+                state.tourInterval = setInterval(nextTourStep, 6000);
+                btn.innerHTML = '<i class="fa-solid fa-pause"></i>';
+            }
+        }
+
+        function exitTourMode() {
+            state.isTourActive = false;
+            if (state.tourInterval) clearInterval(state.tourInterval);
+            document.getElementById('tour-controls').classList.add('hidden');
+        }
+
+        /* =========================================================================
+         * 8. BUILDER WORKSHOP INTERACTION
+         * ========================================================================= */
+        function toggleBuildWorkshop() {
+            state.isWorkshopActive = !state.isWorkshopActive;
+            const bar = document.getElementById('build-workshop-bar');
+            if (state.isWorkshopActive) {
+                bar.classList.remove('hidden');
+            } else {
+                bar.classList.add('hidden');
+            }
+        }
+
+        /* =========================================================================
+         * 9. RAYCASTING & CLICK EVENTS
+         * ========================================================================= */
+        function onDocumentPointerMove(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function onDocumentPointerDown(event) {
+            // Ignore click if clicking UI controls
+            if (event.target.closest('.pointer-auto')) return;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            if (state.isWorkshopActive) {
+                // Raycast on Island Surfaces to place custom props
+                const intersects = raycaster.intersectObjects(scene.children, true);
+                const islandIntersect = intersects.find(i => i.object.name === "island_surface");
+                if (islandIntersect) {
+                    const pt = islandIntersect.point;
+                    const prop = createPropMesh(state.selectedProp);
+                    prop.position.set(pt.x, pt.y, pt.z);
+                    scene.add(prop);
+
+                    // Save locally
+                    state.customBuilds.push({ type: state.selectedProp, x: pt.x, y: pt.y, z: pt.z });
+                    localStorage.setItem('tw_culture_builds', JSON.stringify(state.customBuilds));
+                }
+            } else {
+                // Raycast to inspect islands or NPCs
+                const intersects = raycaster.intersectObjects(scene.children, true);
+                if (intersects.length > 0) {
+                    let obj = intersects[0].object;
+                    while (obj.parent && obj.parent.type === "Group" && !obj.userData.id) {
+                        obj = obj.parent;
+                    }
+                    if (obj.userData && obj.userData.id) {
+                        const idx = CULTURAL_DATA.findIndex(d => d.id === obj.userData.id);
+                        if (idx !== -1) focusOnIsland(idx);
+                    }
+                }
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        /* =========================================================================
+         * 10. ANIMATION LOOP
+         * ========================================================================= */
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const time = Date.now() * 0.001;
+
+            // Floating movement for islands
+            Object.keys(islandGroupMap).forEach((id, i) => {
+                const group = islandGroupMap[id];
+                group.position.y = CULTURAL_DATA[i].pos.y + Math.sin(time + i) * 0.4;
+            });
+
+            // Walking movement for NPCs
+            animatedNPCs.forEach(npc => {
+                npc.userData.angle += npc.userData.speed;
+                npc.position.x = Math.cos(npc.userData.angle) * 3.5;
+                npc.position.z = Math.sin(npc.userData.angle) * 3.5;
+                npc.rotation.y = -npc.userData.angle + Math.PI / 2;
+            });
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        /* =========================================================================
+         * 11. INITIALIZATION ON WINDOW LOAD
+         * ========================================================================= */
+        window.onload = function () {
+            init3DEngine();
+            renderUI();
+            focusOnIsland(0);
+            animate();
+        };
+    </script>
+</body>
+</html>
